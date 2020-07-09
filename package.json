@@ -1,0 +1,49 @@
+{
+  "name": "dueroku",
+  "version": "0.0.0",
+  "author": "Peter O'Leary @peteoleary",
+  "bin": {
+    "dueroku": "./bin/run"
+  },
+  "bugs": "https://github.com/peteoleary/dueroku/issues",
+  "dependencies": {
+    "@heroku-cli/command": "^8.3.0",
+    "@heroku-cli/schema": "^1.0.25",
+    "@oclif/command": "^1",
+    "@oclif/config": "^1",
+    "@oclif/plugin-help": "^3",
+    "tslib": "^1"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": ">=8.0.0"
+  },
+  "files": [
+    "/bin",
+    "/lib",
+    "/npm-shrinkwrap.json",
+    "/oclif.manifest.json"
+  ],
+  "homepage": "https://github.com/peteoleary/dueroku",
+  "keywords": [
+    "oclif"
+  ],
+  "license": "MIT",
+  "main": "lib/index.js",
+  "oclif": {
+    "commands": "./src/commands",
+    "bin": "dueroku",
+    "plugins": [
+      "@oclif/plugin-help"
+    ]
+  },
+  "repository": "peteoleary/dueroku",
+  "scripts": {
+    "postpack": "rm -f oclif.manifest.json",
+    "posttest": "eslint . --ext .ts --config .eslintrc",
+    "prepack": "rm -rf lib && tsc -b && oclif-dev manifest && oclif-dev readme",
+    "test": "nyc --extension .ts mocha --forbid-only \"test/**/*.test.ts\"",
+    "version": "oclif-dev readme && git add README.md"
+  },
+  "types": "lib/index.d.ts"
+}
