@@ -1,0 +1,34 @@
+# TODO: correct Ruby version
+FROM ruby:2.5.1
+RUN apt-get update -qq
+RUN curl -sL https://deb.nodesource.com/setup_10.x | bash -
+# TODO: install the correct db client
+RUN apt-get install -y nodejs postgresql-client
+RUN mkdir /{{name}}
+WORKDIR /{{name}}
+COPY Gemfile /{{name}}/Gemfile
+COPY Gemfile.lock /{{name}}/Gemfile.lock
+
+# https://bundler.io/v2.0/guides/bundler_docker_guide.html
+# ENV GEM_HOME="/usr/local/bundle"
+# ENV PATH $GEM_HOME/bin:$GEM_HOME/gems/bin:$PATH
+
+# TODO: correct bundler version
+ENV BUNDLER_VERSION='2.1.4'
+RUN gem update --system
+RUN gem install bundler -v 2.1.4
+RUN bundle --version
+RUN bundle install
+COPY . /{{name}}
+
+# Add a script to be executed every time the container starts.
+COPY entrypoint.sh /usr/bin/
+RUN chmod +x /usr/bin/entrypoint.sh
+ENTRYPOINT ["entrypoint.sh"]
+EXPOSE 3000
+
+# precompile assets in production mode
+RUN RAILS_ENV=production bundle exec rake assets:precompile
+
+# Start the main process.
+CMD ["rails", "server", "-b", "0.0.0.0"]
