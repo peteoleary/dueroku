@@ -91,8 +91,9 @@ class DockerComposeCommand extends Command {
   addServicesFromProcFile(app_info_vars, deps) {
 
     var commands = this.readProcfile()
-    commands.keys().each(command => {
-      app_info_vars.push(
+
+    for (var command in commands) {
+      app_info_vars.services.push(
         {
           name: `${app_info_vars.name}_${command}`,
           build: '.',
@@ -108,8 +109,7 @@ class DockerComposeCommand extends Command {
             })
           ]
       })
-    })
-
+    }
   }
 
   makeDockerComposeFile(app_information_req, app_addon_information_req, force) {
@@ -119,6 +119,7 @@ class DockerComposeCommand extends Command {
     // analyze dependencies first
     var deps = this.analyzeDependancies(app_addon_information_req.body)
 
+    app_info_vars.services = []
     this.addServicesFromProcFile(app_info_vars, deps)
     app_info_vars.volumes = []
 
@@ -129,7 +130,7 @@ class DockerComposeCommand extends Command {
 
     // if there are backend components, add a network
     if (deps.length > 0) {
-      app_info_vars.push('backend')
+      app_info_vars.networks.push('backend')
     }
 
     app_addon_information_req.body.forEach(add_on => {
