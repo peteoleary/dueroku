@@ -1,0 +1,31 @@
+version: '3'
+
+services:
+  {{#each services}}
+  {{this.name}}:
+    {{#if this.image}}
+    image: {{this.image}}
+    {{/if}}
+    {{#if this.build}}
+    build: {{this.build}}
+    {{/if}}
+    env_file:
+        - {{this.env_file}}
+    ports:
+      - {{this.ports}}
+    networks:
+      - {{this.networks}}
+    depends_on:
+      - {{depends_on}}
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 2
+      restart_policy:
+        condition: on-failure
+  {{/each}}
+
+volumes:
+    {{#each volumes}}
+    {{this.name}}
+    {{/each}}
