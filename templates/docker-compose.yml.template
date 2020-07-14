@@ -6,26 +6,45 @@ services:
     {{#if this.image}}
     image: {{this.image}}
     {{/if}}
+    {{#if this.command}}
+    command: {{this.command}}
+    {{/if}}
     {{#if this.build}}
     build: {{this.build}}
     {{/if}}
+    {{#if this.env_file}}
     env_file:
         - {{this.env_file}}
+    {{/if}}
+    {{#if this.ports}}
     ports:
       - {{this.ports}}
+    {{/if}}
     networks:
-      - {{this.networks}}
+    {{#each this.networks}}
+      - {{this}}
+    {{/each}}
+    {{#if this.depends_on}}
     depends_on:
-      - {{depends_on}}
-    deploy:
-      replicas: 2
-      update_config:
-        parallelism: 2
-      restart_policy:
-        condition: on-failure
+      {{#each this.depends_on}}
+      - {{this}}
+      {{/each}}
+    {{/if}}
+    {{#if this.volumes}}
+    volumes:
+      {{#each this.volumes}}
+      - {{this}}
+      {{/each}}
+    {{/if}}
   {{/each}}
 
 volumes:
     {{#each volumes}}
-    {{this.name}}
+    {{this}}:
+    {{/each}}
+
+
+networks:
+    {{#each networks}}
+    {{this}}:
     {{/each}}

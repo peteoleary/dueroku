@@ -3,6 +3,8 @@ var fs = require('fs'), ini = require('ini'), url = require("url")
 var cli = require('cli-ux')
 const dotenv = require('dotenv')
 
+var generator = require('generate-password');
+
 var TemplateEngine = require('../utils/template_engine')
 
 class DockerComposeCommand extends Command {
@@ -88,28 +90,62 @@ class DockerComposeCommand extends Command {
     }
   }
 
+  getBaseEnvFileName(app_info_vars) {
+    return `${app_info_vars.name}.env`
+  }
+
   addServicesFromProcFile(app_info_vars, deps) {
 
     var commands = this.readProcfile()
 
     for (var command in commands) {
+
+      var ports = null
+      if (command == 'web') {
+        ports = '3000:3000'
+      }
+
       app_info_vars.services.push(
         {
           name: `${app_info_vars.name}_${command}`,
           build: '.',
+          ports: ports,
+          command: commands[command],
+          env_file: this.getBaseEnvFileName(app_info_vars),
           networks: [
-            'frontend'
+            'frontend', 'backend'
           ],
           volumes: [
-            `.:${app_info_vars.name}`
+            `.:/${app_info_vars.name}`
           ],
-          depends_on: [
+          depends_on: 
             deps.map(d => {
               return d.name
             })
-          ]
       })
     }
+  }
+
+  writeEnvFile(envFileName, envVars) {
+    var lines = Object.keys(envVars).map(k => {
+      return `${k}=${envVars[k]}`
+    })
+
+    fs.writeFileSync(envFileName, lines.join("\n"))
+  }
+
+  makeDatabaseEnv(databaseEnvFileName, app_info_vars, add_on) {
+    var databaseEnv = {
+      POSTGRES_USER: `${app_info_vars.name}_user`,
+      POSTGRES_PASSWORD: generator.generate({
+        length: 10,
+        numbers: true}),
+      POSTGRES_DB: `${app_info_vars.name}_db`
+    }
+
+    this.writeEnvFile(databaseEnvFileName, databaseEnv)
+
+    return databaseEnv
   }
 
   makeDockerComposeFile(app_information_req, app_addon_information_req, force) {
@@ -141,9 +177,12 @@ class DockerComposeCommand extends Command {
 
         app_info_vars.volumes.push(volume_name)
 
+        var databaseEnvFileName = `${add_on.name}.env`
+        var databseEnv = this.makeDatabaseEnv(databaseEnvFileName, app_info_vars, add_on)
+
         app_info_vars.services.push({
           name: add_on.name,
-          env: `${add_on.name}.env`,
+          env_file: databaseEnvFileName,
           image: 'postgres:12.2',
           volumes: [
             `${volume_name}:/var/lib/postgresql/data`
@@ -152,6 +191,12 @@ class DockerComposeCommand extends Command {
             'backend'
           ]
         })
+
+        base_dot_env['DATABASE_NAME'] = databseEnv['POSTGRES_DB']
+        base_dot_env['DATABASE_USER'] = databseEnv['POSTGRES_USER']
+        base_dot_env['DATABASE_PASSWORD'] = databseEnv['POSTGRES_PASSWORD']
+        base_dot_env['DATABASE_HOST'] = add_on.name
+
       } else if (add_on.addon_service.name == 'heroku-redis') {
         app_info_vars.volumes.push(volume_name)
 
@@ -166,7 +211,12 @@ class DockerComposeCommand extends Command {
             'backend'
           ]
         })
+
+        base_dot_env['REDIS_URL'] = `redis://${add_on.name}`
       }
+
+      // write docker.env file with modified variables
+      this.writeEnvFile(this.getBaseEnvFileName(app_info_vars), base_dot_env)
 
       // add_one.config_vars
     })
