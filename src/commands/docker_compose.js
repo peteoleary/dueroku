@@ -135,15 +135,22 @@ class DockerComposeCommand extends Command {
   }
 
   makeDatabaseEnv(databaseEnvFileName, app_info_vars, add_on) {
-    var databaseEnv = {
-      POSTGRES_USER: `${app_info_vars.name}_user`,
-      POSTGRES_PASSWORD: generator.generate({
-        length: 10,
-        numbers: true}),
-      POSTGRES_DB: `${app_info_vars.name}_db`
-    }
 
-    this.writeEnvFile(databaseEnvFileName, databaseEnv)
+    var databaseEnv
+
+    if (fs.existsSync(databaseEnvFileName)) {
+      databaseEnv = dotenv.parse(fs.readFileSync(databaseEnvFileName))
+      console.info(`database environment file ${databaseEnvFileName} exists, re-using it so we don't lose the db password`)
+    } else {
+      databaseEnv = {
+        POSTGRES_USER: `${app_info_vars.name}_user`,
+        POSTGRES_PASSWORD: generator.generate({
+          length: 10,
+          numbers: true}),
+        POSTGRES_DB: `${app_info_vars.name}_db`
+      }
+      this.writeEnvFile(databaseEnvFileName, databaseEnv)
+  }
 
     return databaseEnv
   }
