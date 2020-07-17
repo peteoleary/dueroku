@@ -40,19 +40,19 @@ class DockerComposeCommand extends Command {
     }
   }
 
-  makeAppInformationVars(app_information) {
-    return {
-      name: app_information.name
-    }
-  }
+  makeDockerFiles(app_info_vars, force) {
 
-  makeDockerFile(app_information_req, force) {
-    var build_stack = app_information_req.body.build_stack.name
+    app_info_vars.services.forEach(service => {
+      // TODO: pick the template based on buildpack!
 
-    // TODO: pick the template based on buildpack!
-    var file_text = (new TemplateEngine).resolveTemplate('Dockerfile.rails', this.makeAppInformationVars(app_information_req.body))
+      if (service.build) {
+        var file_text = (new TemplateEngine).resolveTemplate('Dockerfile.rails', service)
 
-    this.writeOrReplaceFile('Dockerfile', file_text, force)
+        // TODO: if this is a Ruby app, read the Gemfile
+
+        this.writeOrReplaceFile(service.build.dockerfile, file_text, force)
+      }
+    })
   }
 
   isADatabase(add_on) {
@@ -94,9 +94,11 @@ class DockerComposeCommand extends Command {
     return `${app_info_vars.name}.env`
   }
 
-  addServicesFromProcFile(app_info_vars, deps) {
+  getServicesFromProcFile(app_info_vars, deps) {
 
     var commands = this.readProcfile()
+
+    var services = []
 
     for (var command in commands) {
 
@@ -105,10 +107,16 @@ class DockerComposeCommand extends Command {
         ports = '3000:3000'
       }
 
-      app_info_vars.services.push(
+      var service_name = `${app_info_vars.name}_${command}`
+
+      services.push(
         {
-          name: `${app_info_vars.name}_${command}`,
-          build: '.',
+          name: service_name,
+          // TODO: get correct versions
+          ruby_version: '2.6.3',
+          bundler_version: '2.1.4',
+          build: {context: '.',
+            dockerfile: `Dockerfile.${service_name}` },
           ports: ports,
           command: commands[command],
           env_file: this.getBaseEnvFileName(app_info_vars),
@@ -124,6 +132,8 @@ class DockerComposeCommand extends Command {
             })
       })
     }
+
+    return services
   }
 
   writeEnvFile(envFileName, envVars) {
@@ -157,13 +167,16 @@ class DockerComposeCommand extends Command {
 
   makeDockerComposeFile(app_information_req, app_addon_information_req, force) {
     
-    var app_info_vars = this.makeAppInformationVars(app_information_req.body)
+    var app_info_vars = {
+      name: app_information_req.body.name,
+      // TODO: handle multiple buildpacks per app
+      build_stack: app_information_req.body.build_stack.name
+    }
 
     // analyze dependencies first
     var deps = this.analyzeDependancies(app_addon_information_req.body)
 
-    app_info_vars.services = []
-    this.addServicesFromProcFile(app_info_vars, deps)
+    app_info_vars.services = this.getServicesFromProcFile(app_info_vars, deps)
     app_info_vars.volumes = []
 
     var base_dot_env = dotenv.parse(fs.readFileSync('./.env'))
@@ -222,16 +235,23 @@ class DockerComposeCommand extends Command {
         base_dot_env['REDIS_URL'] = `redis://${add_on.name}`
       }
 
-      // write docker.env file with modified variables
-      this.writeEnvFile(this.getBaseEnvFileName(app_info_vars), base_dot_env)
-
       // add_one.config_vars
     })
+
+    // TODO: only add these if it's a RACK/RAILS app
+    base_dot_env['RACK_ENV'] = 'production'
+    base_dot_env['RAILS_ENV'] = 'production'
+    // TODO: check to make sure secret key exists in .env
+
+    // write docker.env file with modified variables
+    this.writeEnvFile(this.getBaseEnvFileName(app_info_vars), base_dot_env)
 
     // TODO: pick the template based on buildpack!
     var file_text = (new TemplateEngine).resolveTemplate('docker-compose.yml', app_info_vars)
 
     this.writeOrReplaceFile('docker-compose.yml', file_text, force)
+
+    return app_info_vars
   }
 
   async run() {
@@ -242,8 +262,8 @@ class DockerComposeCommand extends Command {
     const app_information_req = await this.heroku.get(`/apps/${name}`)
     const app_addon_information_req = await this.heroku.get(`/apps/${name}/addons`)
 
-    this.makeDockerFile(app_information_req, flags.force)
-    this.makeDockerComposeFile(app_information_req, app_addon_information_req, flags.force)
+    var app_info_vars = this.makeDockerComposeFile(app_information_req, app_addon_information_req, flags.force)
+    this.makeDockerFiles(app_info_vars, flags.force)
   }
 }
 

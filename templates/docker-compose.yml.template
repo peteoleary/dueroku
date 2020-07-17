@@ -9,8 +9,13 @@ services:
     {{#if this.command}}
     command: {{this.command}}
     {{/if}}
+    {{#if this.entrypoint}}
+    entrypoint: {{this.entrypoint}}
+    {{/if}}
     {{#if this.build}}
-    build: {{this.build}}
+    build:
+      context: {{this.build.context}}
+      dockerfile: {{this.build.dockerfile}}
     {{/if}}
     {{#if this.env_file}}
     env_file:

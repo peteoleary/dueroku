@@ -1,5 +1,5 @@
 # TODO: correct Ruby version
-FROM ruby:2.5.1
+FROM ruby:{{ruby_version}}
 RUN apt-get update -qq
 RUN curl -sL https://deb.nodesource.com/setup_10.x | bash -
 # TODO: install the correct db client
@@ -14,21 +14,28 @@ COPY Gemfile.lock /{{name}}/Gemfile.lock
 # ENV PATH $GEM_HOME/bin:$GEM_HOME/gems/bin:$PATH
 
 # TODO: correct bundler version
-ENV BUNDLER_VERSION='2.1.4'
+ENV BUNDLER_VERSION='{{bundler_version}}'
 RUN gem update --system
-RUN gem install bundler -v 2.1.4
+RUN gem install bundler -v {{bundler_version}}
 RUN bundle --version
 RUN bundle install
 COPY . /{{name}}
 
+{{#if entrypoint}}
 # Add a script to be executed every time the container starts.
-COPY entrypoint.sh /usr/bin/
-RUN chmod +x /usr/bin/entrypoint.sh
-ENTRYPOINT ["entrypoint.sh"]
-EXPOSE 3000
+COPY {{entrypoint}} /usr/bin/
+RUN chmod +x /usr/bin/{{entrypoint}}
+ENTRYPOINT ["{{entrypoint}}"]
+{{/if}}
 
+{{#if port}}
+EXPOSE {{port}}
+{{/if}}
+
+{{#if is_rails}}
 # precompile assets in production mode
 RUN RAILS_ENV=production bundle exec rake assets:precompile
+{{/if}}
 
 # Start the main process.
-CMD ["rails", "server", "-b", "0.0.0.0"]
+CMD {{command}}
