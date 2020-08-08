@@ -7,24 +7,12 @@ const gemfile = require('gemfile-parser')
 var generator = require('generate-password');
 
 var TemplateEngine = require('../utils/template_engine')
+const HerokuTools = require('../utils/heroku_tools')
 
 class DockerComposeCommand extends Command {
 
-  gitConfig() {
-    return ini.parse(fs.readFileSync('./.git/config', 'utf-8'))
-  }
-
-  getCurrentHerokuAppName() {
-    var config = this.gitConfig()
-
-    if ("remote \"heroku\"" in config) {
-      var url_parts = url.parse(config["remote \"heroku\""].url)
-
-      // TODO: this is fragile
-      return url_parts.pathname.split('.')[0].replace("\/", "")
-    } else {
-      return null
-    }
+  init () {
+    this.heroku_tools = new HerokuTools(this.heroku)
   }
 
   fail(message) {
@@ -41,11 +29,6 @@ class DockerComposeCommand extends Command {
     }
   }
 
-  readGemFile() {
-    var gemFileContents = fs.readFileSync('./Gemfile')
-    return gemfile.parseGemfile(gemFileContents.toString())
-  }
-
   makeDockerFiles(app_info_vars, force) {
 
     app_info_vars.services.forEach(service => {
@@ -55,92 +38,11 @@ class DockerComposeCommand extends Command {
         var file_text = (new TemplateEngine).resolveTemplate('Dockerfile.rails', service)
 
         // TODO: if this is a Ruby app, read the Gemfile
-        var gem_info = this.readGemFile()
+        var gem_info = this.heroku_tools.readGemFile()
 
         this.writeOrReplaceFile(service.build.dockerfile, file_text, force)
       }
     })
-  }
-
-  isADatabase(add_on) {
-    return add_on.addon_service.name == 'heroku-postgresql' || add_on.addon_service.name == 'heroku-redis'
-  }
-
-  analyzeDependancies(app_addon_information) {
-    var database_add_ons = []
-    app_addon_information.forEach(add_on => {
-      if (this.isADatabase(add_on)) {
-        database_add_ons.push({
-          name: add_on.name,
-          service_name: add_on.addon_service.name,
-          config: add_on.config_vars
-        })
-      }
-    })
-    return database_add_ons
-  }
-
-  readProcfile() {
-    var procfile_contents = fs.readFileSync('Procfile')
-    if (!procfile_contents) {
-      return {
-        web: "bundle exec puma -C config/puma.rb"
-      }
-    } else {
-      var lines = procfile_contents.toString().split("\n")
-      var commands = {}
-      lines.forEach(line => {
-        var parts = line.split(':')
-        commands[parts[0]] = parts[1].trim()
-      })
-      return commands 
-    }
-  }
-
-  getBaseEnvFileName(app_info_vars) {
-    return `${app_info_vars.name}.env`
-  }
-
-  getServicesFromProcFile(app_info_vars, deps) {
-
-    var commands = this.readProcfile()
-
-    var services = []
-
-    for (var command in commands) {
-
-      var ports = null
-      if (command == 'web') {
-        ports = '3000:3000'
-      }
-
-      var service_name = `${app_info_vars.name}_${command}`
-
-      services.push(
-        {
-          name: service_name,
-          // TODO: get correct versions
-          ruby_version: '2.6.3',
-          bundler_version: '2.1.4',
-          build: {context: '.',
-            dockerfile: `Dockerfile.${service_name}` },
-          ports: ports,
-          command: commands[command],
-          env_file: this.getBaseEnvFileName(app_info_vars),
-          networks: [
-            'frontend', 'backend'
-          ],
-          volumes: [
-            `.:/${app_info_vars.name}`
-          ],
-          depends_on: 
-            deps.map(d => {
-              return d.name
-            })
-      })
-    }
-
-    return services
   }
 
   writeEnvFile(envFileName, envVars) {
@@ -181,9 +83,9 @@ class DockerComposeCommand extends Command {
     }
 
     // analyze dependencies first
-    var deps = this.analyzeDependancies(app_addon_information_req.body)
+    var deps = this.heroku_tools.analyzeDependancies(app_addon_information_req.body)
 
-    app_info_vars.services = this.getServicesFromProcFile(app_info_vars, deps)
+    app_info_vars.services = this.heroku_tools.getServicesFromProcFile(app_info_vars, deps)
     app_info_vars.volumes = []
 
     var base_dot_env = dotenv.parse(fs.readFileSync('./.env'))
@@ -251,7 +153,7 @@ class DockerComposeCommand extends Command {
     // TODO: check to make sure secret key exists in .env
 
     // write docker.env file with modified variables
-    this.writeEnvFile(this.getBaseEnvFileName(app_info_vars), base_dot_env)
+    this.writeEnvFile(this.heroku_tools.getBaseEnvFileName(app_info_vars), base_dot_env)
 
     // TODO: pick the template based on buildpack!
     var file_text = (new TemplateEngine).resolveTemplate('docker-compose.yml', app_info_vars)
@@ -263,11 +165,11 @@ class DockerComposeCommand extends Command {
 
   async run() {
     const {flags} = this.parse(DockerComposeCommand)
-    const name = flags.app || this.getCurrentHerokuAppName() || this.fail('run command from inside Heroku app directory or provide -a app_name')
+    const name = flags.app || this.heroku_tools.getCurrentHerokuAppName() || this.fail('run command from inside Heroku app directory or provide -a app_name')
     this.log(`hello ${name} from /Users/pete_o/Documents/Dev/dueroku/src/commands/docker_compose.js`)
 
-    const app_information_req = await this.heroku.get(`/apps/${name}`)
-    const app_addon_information_req = await this.heroku.get(`/apps/${name}/addons`)
+    const app_information_req = await this.heroku_tools.getAppInformation(name)
+    const app_addon_information_req = await this.heroku_tools.getAppAddonInformation(name)
 
     var app_info_vars = this.makeDockerComposeFile(app_information_req, app_addon_information_req, flags.force)
     this.makeDockerFiles(app_info_vars, flags.force)
