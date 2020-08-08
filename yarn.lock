@@ -475,6 +475,11 @@ fs-extra@^9.0.1:
     jsonfile "^6.0.1"
     universalify "^1.0.0"
 
+gemfile-parser@^0.1.0:
+  version "0.1.0"
+  resolved "https://registry.yarnpkg.com/gemfile-parser/-/gemfile-parser-0.1.0.tgz#f18f1b7a4affda4314f80b45477649a69a50254f"
+  integrity sha512-VJfhAC7Viyy/fny6xZ8WKuMtoJ1ch9vruvKdc+RuOcGlvZEQgPR+SpM2YbN7x7Q8h+ckP3klGkbZ3dlzE7uNYg==
+
 generate-password@^1.5.1:
   version "1.5.1"
   resolved "https://registry.yarnpkg.com/generate-password/-/generate-password-1.5.1.tgz#ad463fadee1b4818edb7b827ff6f3499587d8dd5"

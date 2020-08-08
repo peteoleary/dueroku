@@ -5,21 +5,16 @@ RUN curl -sL https://deb.nodesource.com/setup_10.x | bash -
 # TODO: install the correct db client
 RUN apt-get install -y nodejs postgresql-client
 RUN mkdir /{{name}}
+
+COPY . /{{name}}
+
 WORKDIR /{{name}}
-COPY Gemfile /{{name}}/Gemfile
-COPY Gemfile.lock /{{name}}/Gemfile.lock
 
-# https://bundler.io/v2.0/guides/bundler_docker_guide.html
-# ENV GEM_HOME="/usr/local/bundle"
-# ENV PATH $GEM_HOME/bin:$GEM_HOME/gems/bin:$PATH
-
-# TODO: correct bundler version
 ENV BUNDLER_VERSION='{{bundler_version}}'
 RUN gem update --system
 RUN gem install bundler -v {{bundler_version}}
 RUN bundle --version
 RUN bundle install
-COPY . /{{name}}
 
 {{#if entrypoint}}
 # Add a script to be executed every time the container starts.

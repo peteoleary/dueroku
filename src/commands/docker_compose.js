@@ -2,6 +2,7 @@ const {Command, flags} = require('@heroku-cli/command')
 var fs = require('fs'), ini = require('ini'), url = require("url")
 var cli = require('cli-ux')
 const dotenv = require('dotenv')
+const gemfile = require('gemfile-parser')
 
 var generator = require('generate-password');
 
@@ -40,6 +41,11 @@ class DockerComposeCommand extends Command {
     }
   }
 
+  readGemFile() {
+    var gemFileContents = fs.readFileSync('./Gemfile')
+    return gemfile.parseGemfile(gemFileContents.toString())
+  }
+
   makeDockerFiles(app_info_vars, force) {
 
     app_info_vars.services.forEach(service => {
@@ -49,6 +55,7 @@ class DockerComposeCommand extends Command {
         var file_text = (new TemplateEngine).resolveTemplate('Dockerfile.rails', service)
 
         // TODO: if this is a Ruby app, read the Gemfile
+        var gem_info = this.readGemFile()
 
         this.writeOrReplaceFile(service.build.dockerfile, file_text, force)
       }
