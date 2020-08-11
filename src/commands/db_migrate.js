@@ -42,8 +42,20 @@ class DBMigrateCommand extends Command {
 
     const rows = await from_db[table_name].find()
 
-    await to_db[table_name].insert(rows)
-    
+    const chunk_size = 500
+    var i = 0
+
+    while (i < rows.length) {
+      console.log(`loading ${table_name}, i=${i}`)
+      await to_db[table_name].insert(rows.slice(i, i + chunk_size))
+      i+= chunk_size
+    }
+
+    // TODO: do this in chunks so we don't blow up pg-promise
+    }
+
+    fail(message) {
+      throw message
     }
 
     async run() {
