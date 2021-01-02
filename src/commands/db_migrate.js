@@ -10,7 +10,7 @@ class DBMigrateCommand extends Command {
         this.heroku_tools = new HerokuTools(this.heroku)
       }
 
-    async doUpload(table_name) {
+    async doCopyTable(table_name, direction) {
       var base_dot_env = dotenv.parse(fs.readFileSync('./.env'))
       
       /*
@@ -20,14 +20,14 @@ class DBMigrateCommand extends Command {
       })
       */
 
-    const from_db = await massive({
+    const local_db = await massive({
       host: base_dot_env.DATABASE_HOST,
       user: base_dot_env.DATABASE_USER,
       database: base_dot_env.DATABASE_NAME,
       port: 5432
     });
 
-    const to_db = await massive({
+    const remote_db = await massive({
       host: base_dot_env.HEROKU_DB_HOST,
       user: base_dot_env.HEROKU_DB_USER,
       database: base_dot_env.HEROKU_DB_NAME,
@@ -39,6 +39,14 @@ class DBMigrateCommand extends Command {
       },
       port: 5432
     });
+
+    let to_db = local_db
+    let from_db = remote_db
+
+    if (direction == 'up') {
+      to_db = remote_db
+      from_db = local_db
+    }
 
     const rows = await from_db[table_name].find()
 
@@ -67,7 +75,7 @@ class DBMigrateCommand extends Command {
         // const app_addon_information_req = await this.heroku_tools.getAppAddonInformation(name)
 
         // TODO: handle direction flag
-        this.doUpload(flags.table)
+        this.doCopyTable(flags.table, flags.direction)
       }
       
 }

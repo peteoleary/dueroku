@@ -1,4 +1,6 @@
-const {Command, flags} = require('@heroku-cli/command')
+const {flags} = require('@heroku-cli/command')
+const path = require('path')
+const {CommandBase} = require(path.resolve( __dirname, './command_base'))
 var fs = require('fs'), ini = require('ini'), url = require("url")
 var cli = require('cli-ux')
 const dotenv = require('dotenv')
@@ -9,24 +11,10 @@ var generator = require('generate-password');
 var TemplateEngine = require('../utils/template_engine')
 const HerokuTools = require('../utils/heroku_tools')
 
-class DockerComposeCommand extends Command {
+class DockerComposeCommand extends CommandBase {
 
   init () {
     this.heroku_tools = new HerokuTools(this.heroku)
-  }
-
-  fail(message) {
-    throw message
-  }
-
-  async writeOrReplaceFile(relativeFilePath, file_text, force) {
-    var do_write = true
-    if (fs.existsSync(relativeFilePath) && !force) {
-      do_write = await cli.cli.confirm(`File ${relativeFilePath} exists, replace (Y/n)`)
-    }
-    if (do_write) {
-      fs.writeFileSync(relativeFilePath, file_text)
-    }
   }
 
   makeDockerFiles(app_info_vars, force) {

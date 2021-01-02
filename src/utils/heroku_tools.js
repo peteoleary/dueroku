@@ -17,10 +17,15 @@ class HerokuTools {
         return this.heroku.get(`/apps/${name}/addons`)
     }
 
+    // TODO: move this to Rails-specific tools
     readGemFile() {
-        var gemFileContents = fs.readFileSync('./Gemfile')
-        return gemfile.parseGemfile(gemFileContents.toString())
-      }
+      var gemFileContents = fs.readFileSync('./Gemfile')
+      return gemfile.parseGemfile(gemFileContents.toString())
+    }
+
+    getAppConfig(name) {
+      return this.heroku.get(`/apps/${name}/config-vars`)
+    }
 
     readProcfile() {
         var procfile_contents = fs.readFileSync('Procfile')
@@ -86,6 +91,7 @@ class HerokuTools {
       }
 
     isADatabase(add_on) {
+      // TODO: add lots of other databases here
         return add_on.addon_service.name == 'heroku-postgresql' || add_on.addon_service.name == 'heroku-redis'
       }
     
