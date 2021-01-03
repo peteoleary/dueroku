@@ -12,6 +12,7 @@
     "@oclif/command": "^1",
     "@oclif/config": "^1",
     "@oclif/plugin-help": "^3",
+    "aws-sdk": "^2.820.0",
     "cli-ux": "^5.4.9",
     "dotenv": "^8.2.0",
     "gemfile-parser": "^0.1.0",
