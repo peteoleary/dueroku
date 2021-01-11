@@ -23,8 +23,22 @@ class HerokuTools {
       return gemfile.parseGemfile(gemFileContents.toString())
     }
 
-    getAppConfig(name) {
-      return this.heroku.get(`/apps/${name}/config-vars`)
+    async getAppConfig(name) {
+      var response = await this.heroku.get(`/apps/${name}/config-vars`)
+      return response.body
+    }
+
+    getEnvDoc() {
+      // look for env.yml
+      var env_doc;
+      try {
+          env_doc = yaml.safeLoad(fs.readFileSync('./env.yml', 'utf8'));
+          console.log('env.yml file found');
+        } catch (e) {
+          env_doc = {env: {}}
+          console.log('env.yml file not found, no variables will be treated as build or secret');
+        }
+        return env_doc
     }
 
     readProcfile() {
@@ -111,6 +125,18 @@ class HerokuTools {
 
     gitConfig() {
         return ini.parse(fs.readFileSync('./.git/config', 'utf-8'))
+      }
+
+      getGitRemoteURL(which_remote) {
+        const git_config = this.gitConfig()
+
+        const origin_url = git_config[`remote "${which_remote}"`].url
+
+        var url_parts = url.parse(origin_url)
+
+        console.log(url_parts)
+
+        if (url_parts.protocol) return origin_url
       }
     
       getCurrentHerokuAppName() {

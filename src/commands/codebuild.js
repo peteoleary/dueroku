@@ -1,44 +1,18 @@
 const {Command, flags} = require('@heroku-cli/command')
-const path = require('path')
-const {CommandBase} = require(path.resolve( __dirname, './command_base'))
+const {CommandBase} = require(require('path').resolve( __dirname, './command_base'))
 const HerokuTools = require('../utils/heroku_tools')
-const dotenv = require('dotenv')
-var fs = require('fs')
-var yaml = require('js-yaml')
 var TemplateEngine = require('../utils/template_engine')
 
 var AWS = require('aws-sdk');
+const { boolean } = require('@oclif/command/lib/flags')
 
 class CodeBuildCommand extends CommandBase {
 
     init () {
         this.heroku_tools = new HerokuTools(this.heroku)
+        this.codebuild = new AWS.CodeBuild({apiVersion: '2016-10-06', region: 'us-east-2'});
+        this.iam = new AWS.IAM({apiVersion: '2010-05-08'});
       }
-
-    makeTemplateVars(app_config, env_doc) {
-        var vars = {}
-        vars['build_envs'] = []
-        vars['run_envs'] = []
-        vars['secret_envs'] = []
-
-          // figure out which ones are secret or needed for build
-        Object.keys(app_config).forEach(config => {
-            const keyAndValue = {key: config, value: app_config[config]}
-            if (env_doc.envs[config]) {
-                if (env_doc.envs[config].includes('build')) {
-                    if (env_doc.envs[config].includes('secret')) {
-                        vars['build_envs'].push({key: config})
-                        vars['secret_envs'].push({key: config})
-                    }
-                    else {
-                        vars['build_envs'].push(keyAndValue)
-                    }
-                }
-            }
-            vars['run_envs'].push(keyAndValue)
-        })
-        return vars
-    }
 
     async doMakeBuildSpecFile(app_config, env_doc, force) {
         
@@ -56,12 +30,12 @@ class CodeBuildCommand extends CommandBase {
 
     async writeCurrentDebugArtifacts(project, force) {
         var {role_name, policy_name} = this.makeRoleAndPolicyNames(project.name)
-        const role = await iam.getRole({RoleName: role_name}).promise()
-        const rolePolicies = await iam.listAttachedRolePolicies({RoleName: role_name}).promise()
+        const role = await this.iam.getRole({RoleName: role_name}).promise()
+        const rolePolicies = await this.iam.listAttachedRolePolicies({RoleName: role_name}).promise()
 
         // TODO check policy_name == rolePolicies.AttachedPolicies[0].PolicyName
 
-        const rolePolicy = await iam.getRolePolicy({RoleName: role_name, PolicyName: policy_name}).promise()
+        const rolePolicy = await this.iam.getRolePolicy({RoleName: role_name, PolicyName: policy_name}).promise()
 
         this.writeToJSONFile(`${project.name}-codebuild-project-existing.json`, project, force)
         this.writeToJSONFile(`${project.name}-codebuild-role-existing.json`, role, force)
@@ -69,8 +43,6 @@ class CodeBuildCommand extends CommandBase {
     }
 
     async doCreateCodebuildProject(name, app_config, env_doc, force, debug) {
-        var codebuild = new AWS.CodeBuild({apiVersion: '2016-10-06', region: 'us-east-2'});
-        var iam = new AWS.IAM({apiVersion: '2010-05-08'});
 
         var params = {
             names: [
@@ -78,7 +50,7 @@ class CodeBuildCommand extends CommandBase {
             ]
           };
 
-          const existing_projects = await codebuild.batchGetProjects(params).promise()
+          const existing_projects = await this.codebuild.batchGetProjects(params).promise()
 
           const project = existing_projects.projects.filter(p => p.name == name)
 
@@ -112,14 +84,13 @@ class CodeBuildCommand extends CommandBase {
             ]
           }
 
-          
 
           const template_engine = new TemplateEngine
 
           var service_role
           
         try {
-            service_role = await iam.createRole({
+            service_role = await this.iam.createRole({
                 AssumeRolePolicyDocument: JSON.stringify(trustPolicy),
                 RoleName: role_name
               }).promise()
@@ -132,12 +103,12 @@ class CodeBuildCommand extends CommandBase {
                 RoleName: role_name
             };
 
-            var new_policy = await iam.putRolePolicy(params).promise()
+            var new_policy = await this.iam.putRolePolicy(params).promise()
 
         } catch (err) {
             if (err.code == 'EntityAlreadyExists') {
                 this.log(`service role ${role_name} already exists`)
-                service_role = await iam.getRole({
+                service_role = await this.iam.getRole({
                     RoleName: role_name
                   }).promise()
             }
@@ -149,19 +120,14 @@ class CodeBuildCommand extends CommandBase {
 
         vars['project_name'] = name
         vars['service_role_arn'] = service_role.Role.Arn
-
-        const git_config = this.heroku_tools.gitConfig()
-
-        const origin_url = git_config[`remote "origin"`].url
-
-        vars['git_repo_location'] = origin_url
+        vars['git_repo_location'] = this.heroku_tools.getGitRemoteURL('origin')
 
           var new_project_text = template_engine.resolveTemplate('create_codebuild_project.json', vars)
 
           try {
             const project_params = JSON.parse(new_project_text)
 
-            const new_project = await codebuild.createProject(project_params).promise()
+            const new_project = await this.codebuild.createProject(project_params).promise()
         } catch (err) {
             this.log(`error creating project ${err.message}`)
         }
@@ -179,18 +145,8 @@ class CodeBuildCommand extends CommandBase {
         this.log(`hello ${name} from /Users/pete_o/Documents/Dev/dueroku/src/commands/codebuild.js`)
 
         // get production env
-        var app_config_response = await this.heroku_tools.getAppConfig(name)
-        var app_config = app_config_response.body
-        
-        // look for env.yml
-        var env_doc;
-        try {
-            env_doc = yaml.safeLoad(fs.readFileSync('./env.yml', 'utf8'));
-            console.log('env.yml file found');
-          } catch (e) {
-            env_doc = {env: {}}
-            console.log('env.yml file not found, no variables will be treated as build or secret');
-          }
+        var app_config = await this.heroku_tools.getAppConfig(name)
+        var env_doc = this.heroku_tools.getEnvDoc()
 
         await this.doMakeBuildSpecFile(app_config, env_doc, flags.force)
         await this.doCreateCodebuildProject(name, app_config, env_doc, flags.force, flags.debug)

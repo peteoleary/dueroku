@@ -21,7 +21,7 @@
         "image": "aws/codebuild/standard:4.0",
         "computeType": "BUILD_GENERAL1_SMALL",
         "environmentVariables": [
-            {{#each this.build_envs}}
+            {{#each this.secret_envs}}
             {
             "name": "{{this.key}}",
             "value": "{{this.value}}",

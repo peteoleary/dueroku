@@ -1,9 +1,9 @@
 const {Command, flags} = require('@heroku-cli/command')
+const {CommandBase} = require(require('path').resolve( __dirname, './command_base'))
 const HerokuTools = require('../utils/heroku_tools')
-const dotenv = require('dotenv')
-var fs = require('fs')
+var TemplateEngine = require('../utils/template_engine')
 
-class BlankCommand extends Command {
+class BlankCommand extends CommandBase {
 
     init () {
         this.heroku_tools = new HerokuTools(this.heroku)

@@ -1,0 +1,59 @@
+{
+  cluster: 'STRING_VALUE', /* required */
+  service: 'STRING_VALUE', /* required */
+  taskDefinition: 'STRING_VALUE', /* required */
+  capacityProviderStrategy: [
+    {
+      capacityProvider: 'STRING_VALUE', /* required */
+      base: 'NUMBER_VALUE',
+      weight: 'NUMBER_VALUE'
+    },
+    /* more items */
+  ],
+  clientToken: 'STRING_VALUE',
+  externalId: 'STRING_VALUE',
+  launchType: EC2 | FARGATE,
+  loadBalancers: [
+    {
+      containerName: 'STRING_VALUE',
+      containerPort: 'NUMBER_VALUE',
+      loadBalancerName: 'STRING_VALUE',
+      targetGroupArn: 'STRING_VALUE'
+    },
+    /* more items */
+  ],
+  networkConfiguration: {
+    awsvpcConfiguration: {
+      subnets: [ /* required */
+        'STRING_VALUE',
+        /* more items */
+      ],
+      assignPublicIp: ENABLED | DISABLED,
+      securityGroups: [
+        'STRING_VALUE',
+        /* more items */
+      ]
+    }
+  },
+  platformVersion: 'STRING_VALUE',
+  scale: {
+    unit: PERCENT,
+    value: 'NUMBER_VALUE'
+  },
+  serviceRegistries: [
+    {
+      containerName: 'STRING_VALUE',
+      containerPort: 'NUMBER_VALUE',
+      port: 'NUMBER_VALUE',
+      registryArn: 'STRING_VALUE'
+    },
+    /* more items */
+  ],
+  tags: [
+    {
+      key: 'STRING_VALUE',
+      value: 'STRING_VALUE'
+    },
+    /* more items */
+  ]
+};
