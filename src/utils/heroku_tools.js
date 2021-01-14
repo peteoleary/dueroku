@@ -2,6 +2,7 @@ const {Command, flags} = require('@heroku-cli/command')
 var fs = require('fs'), ini = require('ini'), url = require("url")
 const dotenv = require('dotenv')
 const gemfile = require('gemfile-parser')
+const yaml = require('js-yaml')
 
 class HerokuTools {
 
@@ -32,10 +33,11 @@ class HerokuTools {
       // look for env.yml
       var env_doc;
       try {
-          env_doc = yaml.safeLoad(fs.readFileSync('./env.yml', 'utf8'));
+          const env_file_text = fs.readFileSync('./env.yml', 'utf8')
+          env_doc = yaml.safeLoad(env_file_text);
           console.log('env.yml file found');
         } catch (e) {
-          env_doc = {env: {}}
+          env_doc = {envs: {}}
           console.log('env.yml file not found, no variables will be treated as build or secret');
         }
         return env_doc
