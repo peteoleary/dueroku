@@ -26,7 +26,21 @@ class CommandBase extends Command {
         this.writeOrReplaceFile(file_name, file_text, force)
     }
 
-    makeTemplateVars(app_config, env_doc) {
+    pushEnvVar(vars, env_key, key, value, type = 'PLAiNTEXT') {
+        vars[env_key].push({
+            key: key,
+            value: value,
+            type: type
+        })
+    }
+
+    makeRoleAndPolicyNames(name) {
+        let role_name = `codebuild-${name}-service-role`
+        let policy_name = `codebuild-${name}-service-role-policy`
+        return { role_name, policy_name }
+    }
+
+    async makeTemplateVars(name, app_config, env_doc) {
         var vars = {}
         // build_envs will be written into buildspec.yml with secret values removed so it can be checked into Github
         vars['build_envs'] = []
@@ -45,7 +59,7 @@ class CommandBase extends Command {
                 }
                 if (env_doc.envs[config].includes('build')) {
                     if (is_secret) {
-                        vars['build_envs'].push({key: config})  // push only the key here
+                        this.pushEnvVar(vars, 'build_envs', config, null, null) // push only the key here
                         vars['secret_envs'].push(keyAndValue)
                     }
                     else {
@@ -55,6 +69,73 @@ class CommandBase extends Command {
             }
             vars['run_envs'].push(keyAndValue)
         })
+
+        // TODO: get actual values for all these
+        const default_region = 'us-east-2'
+
+        // add build envs...
+        this.pushEnvVar(vars, 'build_envs', 'IMAGE_REPO_NAME', name)
+        // override the region for now even though it's in the .env file
+        this.pushEnvVar(vars, 'build_envs', 'AWS_DEFAULT_REGION', default_region)
+        // IMAGE_TAG
+        this.pushEnvVar(vars, 'build_envs', 'IMAGE_TAG', 'latest')
+
+        var {role_name, policy_name} = this.makeRoleAndPolicyNames(name)
+
+        const trustPolicy = {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                "Effect": "Allow",
+                "Principal": {
+                    "Service": "codebuild.amazonaws.com"
+                },
+                "Action": "sts:AssumeRole"
+                }
+            ]
+        }
+
+
+        const template_engine = new TemplateEngine
+
+        var service_role
+          
+        try {
+            service_role = await this.iam.createRole({
+                AssumeRolePolicyDocument: JSON.stringify(trustPolicy),
+                RoleName: role_name
+              }).promise()
+
+            // attach inline policy to role
+            var new_policy_text = template_engine.resolveTemplate('create_codebuild_policy.json', vars)
+            var params = {
+                PolicyDocument: new_policy_text, 
+                PolicyName: policy_name, 
+                RoleName: role_name
+            };
+
+            var new_policy = await this.iam.putRolePolicy(params).promise()
+
+        } catch (err) {
+            if (err.code == 'EntityAlreadyExists') {
+                this.log(`service role ${role_name} already exists`)
+                service_role = await this.iam.getRole({
+                    RoleName: role_name
+                  }).promise()
+            }
+            else {
+                this.log(`unknown error creating role ${err.message}`)
+                return
+            }
+        }
+
+        vars['project_name'] = name
+        vars['service_role_arn'] = service_role.Role.Arn
+        vars['git_repo_location'] = this.heroku_tools.getGitRemoteURL('origin')
+        vars['default_region'] = default_region
+        vars['aws_account_id'] = app_config['AWS_ACCOUNT_ID']
+        vars['command_string'] = 'bundle exec puma -C config/puma.rb'
+
         return vars
     }
 }

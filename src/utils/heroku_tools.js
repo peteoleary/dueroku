@@ -134,11 +134,14 @@ class HerokuTools {
 
         const origin_url = git_config[`remote "${which_remote}"`].url
 
+        // first check to see if this is a URL
         var url_parts = url.parse(origin_url)
-
-        console.log(url_parts)
-
         if (url_parts.protocol) return origin_url
+
+        // it's not a URL, check to see if it is a git reference
+        var re = /^git\@github\.com\:(\S+?)\/(\S+?)\.git/gm
+        var git_parts = re.exec(origin_url)
+        return `https://github.com/${git_parts[1]}/${git_parts[2]}.git`
       }
     
       getCurrentHerokuAppName() {

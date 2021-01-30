@@ -2,15 +2,19 @@
     "AWSTemplateFormatVersion": "2010-09-09",
     "Description": "Description here.",
     "Parameters": {
+        "LatestAmiId": {
+            "Type": "AWS::EC2::Image::Id",
+            "Default": "ami-00d7aa0cdc52740b5"
+        },
         "SubnetAvailabilityZone1": {
             "Description": "Availability Zone for Subnet 1",
             "Type": "String",
-            "Default": "us-west-2a"
+            "Default": "{{this.default_region}}a"
         },
         "SubnetAvailabilityZone2": {
             "Description": "Availability Zone for Subnet 2",
             "Type": "String",
-            "Default": "us-west-2b"
+            "Default": "{{this.default_region}}b"
         },
         "KeyName": {
             "Description": "Name of an existing EC2 KeyPair to enable SSH access to the instances",
@@ -18,7 +22,7 @@
             "ConstraintDescription": "must be the name of an existing EC2 KeyPair."
         },
         "InstanceType": {
-            "Description": "WebServer EC2 instance type",
+            "Description": "EC2 container instance type",
             "Type": "String",
             "Default": "t2.small",
             "AllowedValues": [
@@ -87,167 +91,77 @@
             "Default": "0.0.0.0/0",
             "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
             "ConstraintDescription": "must be a valid IP CIDR range of the form x.x.x.x/x."
-        },
-        "WebServerCapacity": {
-            "Default": "1",
-            "Description": "The initial number of WebServer instances",
-            "Type": "Number",
-            "MinValue": "1",
-            "MaxValue": "5",
-            "ConstraintDescription": "must be between 1 and 5 EC2 instances."
-        },
-        "AdminAppImage": {
-            "Description": "Image for App server. Must be in the same region as other Resources",
-            "Type": "String",
-            "Default": "ami-07a29e5e945228fa1"
-        },
-        "CustomerAppImage": {
-            "Description": "Image for Customer server. Must be in the same region as other Resources",
-            "Type": "String",
-            "Default": "ami-07a29e5e945228fa1"
-        },
-        "APIServerImage": {
-            "Description": "Image for API server. Must be in the same region as other Resources",
-            "Type": "String",
-            "Default": "ami-07a29e5e945228fa1"
         }
     },
     "Resources": {
+        "Cluster": {
+            "Type" : "AWS::ECS::Cluster",
+            "Properties" : {
+                "ClusterName" : "{{this.project_name}}"
+            }
+        },
         "CodeBuild": {
-        "Type" : "AWS::CodeBuild::Project",
-        "Properties" : {
-            "Artifacts" : {
-                "type": "NO_ARTIFACTS"
-            },
-            "Cache" : {
-                "type": "NO_CACHE"
-            },
-            "Environment" : {
-                "type": "LINUX_CONTAINER",
-                "image": "aws/codebuild/standard:4.0",
-                "computeType": "BUILD_GENERAL1_SMALL",
-                "environmentVariables": [
-                    {{#each this.secret_envs}}
-                    {
-                    "name": "{{this.key}}",
-                    "value": "{{this.value}}",
-                    "type": "{{this.type}}"
-                    }{{~#unless @last}},{{/unless}}
-                    {{/each}}
-                ],
-                "privilegedMode": true,
-                "imagePullCredentialsType": "CODEBUILD"
-            },
-            "LogsConfig" : {
-                "cloudWatchLogs": {
-                    "status": "ENABLED"
+            "Type" : "AWS::CodeBuild::Project",
+            "Properties" : {
+                "Artifacts" : {
+                    "Type": "NO_ARTIFACTS"
                 },
-                "s3Logs": {
-                    "status": "DISABLED",
-                    "encryptionDisabled": false
+                "Cache" : {
+                    "Type": "NO_CACHE"
+                },
+                "Environment" : {
+                    "Type": "LINUX_CONTAINER",
+                    "Image": "aws/codebuild/standard:4.0",
+                    "ComputeType": "BUILD_GENERAL1_SMALL",
+                    "EnvironmentVariables": [
+                        {{#each this.secret_envs}}
+                        {
+                        "Name": "{{this.key}}",
+                        "Value": "{{this.value}}",
+                        "Type": "{{this.type}}"
+                        }{{~#unless @last}},{{/unless}}
+                        {{/each}}
+                    ],
+                    "PrivilegedMode": true,
+                    "ImagePullCredentialsType": "CODEBUILD"
+                },
+                "LogsConfig" : {
+                    "CloudWatchLogs": {
+                        "Status": "ENABLED"
+                    },
+                    "S3Logs": {
+                        "Status": "DISABLED",
+                        "EncryptionDisabled": false
+                    }
+                },
+                "Name" : "{{this.project_name}}",
+                "ServiceRole" : {"Ref": "CodeBuildServiceRole"},
+                "Source" : {
+                    "Type": "GITHUB",
+                    "Location": "{{this.git_repo_location}}",
+                    "GitCloneDepth": 1,
+                    "GitSubmodulesConfig": {
+                        "FetchSubmodules": false
+                    },
+                    "ReportBuildStatus": false,
+                    "InsecureSsl": false
                 }
-            },
-            "Name" : "{{this.project_name}}",
-            "ServiceRole" : "{{~this.service_role_arn~}}",
-            "Source" : {
-                "type": "GITHUB",
-                "location": "{{this.git_repo_location}}",
-                "gitCloneDepth": 1,
-                "gitSubmodulesConfig": {
-                    "fetchSubmodules": false
-                },
-                "reportBuildStatus": false,
-                "insecureSsl": false
-            },
-            "VpcConfig" : "VpcConfig"
             }
         },
-        "AppLoadBalancer": {
+        "LoadBalancer": {
             "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
             "Properties": {
                 "Subnets": [
                     {
-                        "Ref": "AppSubnet1"
+                        "Ref": "Subnet1"
                     },
                     {
-                        "Ref": "AppSubnet2"
+                        "Ref": "Subnet2"
                     }
                 ]
-            },
-            "Metadata": {
-                "AWS::CloudFormation::Designer": {
-                    "id": "54377670-4b84-49f7-9546-d6836316a4ac"
-                }
             }
         },
-        "CustomerAppTargetGroup": {
-            "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
-            "Properties": {
-                "VpcId" : {"Ref": "VPC"},
-                "Port" : 80,
-                "Protocol" : "HTTP",
-                "Targets": [
-                    
-                ]
-            },
-            "Metadata": {
-                "AWS::CloudFormation::Designer": {
-                    "id": "3e79f579-6393-47b9-84a7-9c6a2aac6ede"
-                }
-            }
-        },
-        "APITargetGroup": {
-            "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
-            "Properties": {
-                "VpcId" : {"Ref": "VPC"},
-                "Port" : 8080,
-                "Protocol" : "TCP",
-                "Targets": [
-                    
-                ]
-            },
-            "Metadata": {
-                "AWS::CloudFormation::Designer": {
-                    "id": "67f75b3d-ed07-480a-8dbc-26d79af8df7d"
-                }
-            }
-        },
-        "APILoadBalancer": {
-            "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
-            "Properties": {
-                "Type": "network",
-                "Subnets": [
-                    {
-                        "Ref": "APISubnet1"
-                    },
-                    {
-                        "Ref": "APISubnet2"
-                    }
-                ]
-            },
-            "Metadata": {
-                "AWS::CloudFormation::Designer": {
-                    "id": "0eeadd9d-05ed-4784-abc0-642e5120c005"
-                }
-            }
-        },
-        "AdminAppTargetGroup": {
-            "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
-            "Properties": {
-                "VpcId" : {"Ref": "VPC"},
-                "Port" : 80,
-                "Protocol" : "HTTP",
-                "Targets": [
-                    
-                ]
-            },
-            "Metadata": {
-                "AWS::CloudFormation::Designer": {
-                    "id": "45800956-4c26-48ba-8237-274ab5065908"
-                }
-            }
-        },
-        "AppHTTPListener": {
+        "HTTPListener": {
             "Type": "AWS::ElasticLoadBalancingV2::Listener",
             "Properties": {
                 "Protocol" : "HTTP",
@@ -257,45 +171,130 @@
                         "Order": 1,
                         "Type": "forward",
                         "TargetGroupArn": {
-                            "Ref": "CustomerAppTargetGroup"
+                            "Ref": "TargetGroup"
                         }
                     }
                 ],
                 "LoadBalancerArn": {
-                    "Ref": "AppLoadBalancer"
-                }
-            },
-            "Metadata": {
-                "AWS::CloudFormation::Designer": {
-                    "id": "9eeaa1f3-b9d0-4fb0-bf0b-6a875b07d4b0"
+                    "Ref": "LoadBalancer"
                 }
             }
         },
-        "APIListener": {
-            "Type": "AWS::ElasticLoadBalancingV2::Listener",
-            "Properties": {
-                "Protocol": "TCP",
-                "Port": 8080,
-                "DefaultActions": [
+        "CodeBuildServiceRole": {
+            "Type" : "AWS::IAM::Role",
+            "Properties" : {
+                "AssumeRolePolicyDocument" : 
+                {
+                  "Version" : "2012-10-17",
+                  "Statement": [{
+                     "Effect": "Allow",
+                     "Principal": {
+                        "Service": [ "codebuild.amazonaws.com" ]
+                     },
+                     "Action": [ "sts:AssumeRole" ]
+                  } ]
+               },
+                "Policies" : [
                     {
-                        "Order": 1,
-                        "Type": "forward",
-                        "TargetGroupArn": {
-                            "Ref": "APITargetGroup"
+                        "PolicyName": "CodeBuildPolicy",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Action": [
+                                        "ecr:BatchCheckLayerAvailability",
+                                        "ecr:CompleteLayerUpload",
+                                        "ecr:GetAuthorizationToken",
+                                        "ecr:InitiateLayerUpload",
+                                        "ecr:PutImage",
+                                        "ecr:UploadLayerPart"
+                                    ],
+                                    "Resource": "*",
+                                    "Effect": "Allow"
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Resource": [
+                                        "arn:aws:logs:{{~this.default_region~}}:{{~this.aws_account_id~}}:log-group:/aws/codebuild/{{~this.project_name~}}",
+                                        "arn:aws:logs:{{~this.default_region~}}:{{~this.aws_account_id~}}:log-group:/aws/codebuild/{{~this.project_name~}}:*"
+                                    ],
+                                    "Action": [
+                                        "logs:CreateLogGroup",
+                                        "logs:CreateLogStream",
+                                        "logs:PutLogEvents"
+                                    ]
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Resource": [
+                                        "arn:aws:s3:::codepipeline-{{~this.default_region~}}-*"
+                                    ],
+                                    "Action": [
+                                        "s3:PutObject",
+                                        "s3:GetObject",
+                                        "s3:GetObjectVersion",
+                                        "s3:GetBucketAcl",
+                                        "s3:GetBucketLocation"
+                                    ]
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "codebuild:CreateReportGroup",
+                                        "codebuild:CreateReport",
+                                        "codebuild:UpdateReport",
+                                        "codebuild:BatchPutTestCases",
+                                        "codebuild:BatchPutCodeCoverages"
+                                    ],
+                                    "Resource": [
+                                        "arn:aws:codebuild:{{~this.default_region~}}:{{~this.aws_account_id~}}:report-group/{{~this.project_name~}}-*"
+                                    ]
+                                }
+                            ]
                         }
-                    }
-                ],
-                "LoadBalancerArn": {
-                    "Ref": "APILoadBalancer"
-                }
-            },
-            "Metadata": {
-                "AWS::CloudFormation::Designer": {
-                    "id": "9eeaa1f3-b9d0-4fb0-bf0b-6a875b07d4b0"
-                }
+                    }       
+                ]
             }
         },
-        "AppSubnet1": {
+        "TaskServiceRole": {
+            "Type" : "AWS::IAM::Role",
+            "Properties" : {
+                "AssumeRolePolicyDocument" :
+                {
+                    "Version" : "2012-10-17",
+                  "Statement": [{
+                     "Effect": "Allow",
+                     "Principal": {
+                        "Service": [ "ecs-tasks.amazonaws.com" ]
+                     },
+                     "Action": [ "sts:AssumeRole" ]
+                  } ]
+                },
+                "ManagedPolicyArns": [
+                    "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+                ]
+            }
+        },
+        "ServiceServiceRole": {
+            "Type" : "AWS::IAM::Role",
+            "Properties" : {
+                "AssumeRolePolicyDocument" :
+                {
+                  "Version" : "2012-10-17",
+                  "Statement": [{
+                     "Effect": "Allow",
+                     "Principal": {
+                        "Service": [ "ecs.amazonaws.com" ]
+                     },
+                     "Action": [ "sts:AssumeRole" ]
+                  } ]
+               },
+                "ManagedPolicyArns" : [
+                    "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceRole"
+                ]
+            }
+        },
+        "Subnet1": {
             "Type": "AWS::EC2::Subnet",
             "Properties": {
                 "VpcId": {
@@ -304,15 +303,11 @@
                 "AvailabilityZone": {
                     "Ref": "SubnetAvailabilityZone1"
                 },
-                "CidrBlock": "10.0.0.0/24"
-            },
-            "Metadata": {
-                "AWS::CloudFormation::Designer": {
-                    "id": "34277c6f-ff64-4031-bc13-228abe0a77e4"
-                }
+                "CidrBlock": "10.0.0.0/24",
+                "MapPublicIpOnLaunch": true
             }
         },
-        "AppSubnet2": {
+        "Subnet2": {
             "Type": "AWS::EC2::Subnet",
             "Properties": {
                 "VpcId": {
@@ -321,73 +316,25 @@
                 "AvailabilityZone": {
                     "Ref": "SubnetAvailabilityZone2"
                 },
-                "CidrBlock": "10.0.1.0/24"
-            },
-            "Metadata": {
-                "AWS::CloudFormation::Designer": {
-                    "id": "bdcb12bc-7bfb-4368-9fba-0469501d29df"
-                }
+                "CidrBlock": "10.0.1.0/24",
+                "MapPublicIpOnLaunch": true
             }
         },
-        "APISubnet1": {
-            "Type": "AWS::EC2::Subnet",
-            "Properties": {
-                "VpcId": {
-                    "Ref": "VPC"
-                },
-                "AvailabilityZone": {
-                    "Ref": "SubnetAvailabilityZone1"
-                },
-                "CidrBlock": "10.0.2.0/24"
-            },
-            "Metadata": {
-                "AWS::CloudFormation::Designer": {
-                    "id": "333c1bc0-0e62-49cf-b182-53272caadb9f"
+        "Subnet1RT":{
+            "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+                "Properties" : {
+                    "RouteTableId" : { "Ref": "RouteTable" },
+                    "SubnetId" : { "Ref": "Subnet1" }
                 }
-            }
         },
-        "APISubnet2": {
-            "Type": "AWS::EC2::Subnet",
-            "Properties": {
-                "VpcId": {
-                    "Ref": "VPC"
-                },
-                "AvailabilityZone": {
-                    "Ref": "SubnetAvailabilityZone2"
-                },
-                "CidrBlock": "10.0.3.0/24"
-            },
-            "Metadata": {
-                "AWS::CloudFormation::Designer": {
-                    "id": "5620a319-357e-49cc-9ce9-85c9dd7d0879"
+        "Subnet2RT":{
+            "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+                "Properties" : {
+                    "RouteTableId" : { "Ref": "RouteTable" },
+                    "SubnetId" : { "Ref": "Subnet2" }
                 }
-            }
         },
-        "APISecurityGroup": {
-            "Type": "AWS::EC2::SecurityGroup",
-            "Properties": {
-                "GroupDescription": "Open database for access",
-                "SecurityGroupIngress": [
-                    {
-                        "IpProtocol": "tcp",
-                        "FromPort": "3306",
-                        "ToPort": "3306",
-                        "SourceSecurityGroupId": {
-                            "Ref": "AppSecurityGroup"
-                        }
-                    }
-                ],
-                "VpcId": {
-                    "Ref": "VPC"
-                }
-            },
-            "Metadata": {
-                "AWS::CloudFormation::Designer": {
-                    "id": "b8052b79-4c51-4834-ba8c-c8d04a37ed85"
-                }
-            }
-        },
-        "AppSecurityGroup": {
+        "SecurityGroup": {
             "Type": "AWS::EC2::SecurityGroup",
             "Properties": {
                 "GroupDescription": "Enable HTTP access via port 80 locked down to the load balancer + SSH access",
@@ -409,103 +356,21 @@
                 "VpcId": {
                     "Ref": "VPC"
                 }
-            },
-            "Metadata": {
-                "AWS::CloudFormation::Designer": {
-                    "id": "f5f84b37-fb34-41b6-9bb6-b51df725ad21"
-                }
             }
         },
-        "AdminAppServer": {
-            "Type": "AWS::EC2::Instance",
+        "TargetGroup": {
+            "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
             "Properties": {
-                "ImageId" : {"Ref": "AdminAppImage"},
-                "NetworkInterfaces": [
-                    {
-                        "SubnetId": {
-                            "Ref": "AppSubnet1"
-                        },
-                        "DeviceIndex": "0",
-                        "GroupSet": [
-                            {
-                                "Ref": "AppSecurityGroup"
-                            }
-                        ]
-                    }
+                "VpcId" : {"Ref": "VPC"},
+                "Port" : 80,
+                "Protocol" : "HTTP",
+                "Targets": [
+                    
                 ]
-            },
-            "Metadata": {
-                "AWS::CloudFormation::Designer": {
-                    "id": "03fbe94d-c140-41df-9d89-d216e45f2e58"
-                }
-            }
-        },
-        "APIServer": {
-            "Type": "AWS::EC2::Instance",
-            "Properties": {
-                "ImageId" : {"Ref": "APIServerImage"},
-                "NetworkInterfaces": [
-                    {
-                        "SubnetId": {
-                            "Ref": "APISubnet1"
-                        },
-                        "DeviceIndex": "0",
-                        "GroupSet": [
-                            {
-                                "Ref": "APISecurityGroup"
-                            }
-                        ]
-                    }
-                ]
-            },
-            "Metadata": {
-                "AWS::CloudFormation::Designer": {
-                    "id": "ef121cd7-4268-4c9c-8b2f-5f97f027f9d3"
-                }
-            }
-        },
-        "CustomerAppServer": {
-            "Type": "AWS::EC2::Instance",
-            "Properties": {
-                "ImageId" : {"Ref": "CustomerAppImage"},
-                "NetworkInterfaces": [
-                    {
-                        "SubnetId": {
-                            "Ref": "AppSubnet1"
-                        },
-                        "DeviceIndex": "0",
-                        "GroupSet": [
-                            {
-                                "Ref": "AppSecurityGroup"
-                            }
-                        ]
-                    }
-                ]
-            },
-            "Metadata": {
-                "AWS::CloudFormation::Designer": {
-                    "id": "1cdfad39-a270-43d2-9242-f19b02054873"
-                }
-            }
-        },
-        "VPC": {
-            "Type": "AWS::EC2::VPC",
-            "Properties": {
-                "CidrBlock": "10.0.0.0/16"
-            },
-            "Metadata": {
-                "AWS::CloudFormation::Designer": {
-                    "id": "2160bcaf-c7df-44b5-ba08-ea9b9b39d56c"
-                }
             }
         },
         "InternetGateway": {
-            "Type": "AWS::EC2::InternetGateway",
-            "Metadata": {
-                "AWS::CloudFormation::Designer": {
-                    "id": "b292bd84-f885-4496-ba1d-7b852d2199e7"
-                }
-            }
+            "Type": "AWS::EC2::InternetGateway"
         },
         "InternetGatewayAttachment": {
             "Type": "AWS::EC2::VPCGatewayAttachment",
@@ -516,10 +381,198 @@
                 "VpcId": {
                     "Ref": "VPC"
                 }
+            }
+        },
+        "RouteTable":{
+            "Type":"AWS::EC2::RouteTable",
+            "Properties":{
+                "VpcId":{
+                    "Ref":"VPC"
+                }
+            }
+        },
+        "Route":{
+            "Type":"AWS::EC2::Route",
+            "Properties":{
+                "DestinationCidrBlock":"0.0.0.0/0",
+                "GatewayId":{
+                    "Ref":"InternetGateway"
+                },
+                "RouteTableId":{
+                    "Ref":"RouteTable"
+                }
+            }
+        },
+        "TaskDefinition": {
+            "Type" : "AWS::ECS::TaskDefinition",
+            "Properties" : {
+                "ContainerDefinitions" : [ 
+                    {
+                        "Command" : [
+                            "{{this.command_string}}"
+                        ],
+                        "Environment" : [ 
+                            {{#each this.run_envs}}
+                            {
+                            "Name": "{{this.key}}",
+                            "Value": "{{this.value}}"
+                            }{{~#unless @last}},{{/unless}}
+                            {{/each}}
+                         ],
+                        "Image" : { "Ref": "Repository"},
+                        "MemoryReservation": "128",
+                        "Name" : "{{this.project_name}}",
+                        "PortMappings" : [
+                            {
+                                "ContainerPort": 3000,
+                                "HostPort": 80
+                            }
+                        ]
+                    }
+                 ],
+                "TaskRoleArn": {"Ref": "TaskServiceRole"}
+            }
+        },
+        "Repository": {
+            "Type" : "AWS::ECR::Repository",
+            "Properties" : {
+                "RepositoryName" : "{{this.project_name}}"
+            }
+        },
+        "Service": {
+            "Type" : "AWS::ECS::Service",
+            "Properties" : {
+                "Cluster" : {
+                    "Ref": "Cluster"
+                },
+                "DesiredCount" : 1,
+                "ServiceName" : "{{this.project_name}}",
+                "TaskDefinition" : {"Ref": "TaskDefinition"}
             },
-            "Metadata": {
-                "AWS::CloudFormation::Designer": {
-                    "id": "2f39b3a4-0672-49c2-aa74-994c07ae5f9c"
+            "DependsOn": "ContainerInstances"
+        },
+        "VPC": {
+            "Type": "AWS::EC2::VPC",
+            "Properties": {
+                "CidrBlock": "10.0.0.0/16"
+            }
+        },
+         "ContainerInstances":{
+            "Type":"AWS::AutoScaling::LaunchConfiguration",
+            "Properties": {
+                "AssociatePublicIpAddress": true,
+                "ImageId": {"Ref": "LatestAmiId"},
+                "InstanceType": {"Ref": "InstanceType"},
+                "KeyName": {"Ref": "KeyName"}
+            },
+            "DependsOn":[
+                "VPC"
+            ],
+            "Metadata":{
+                "AWS::CloudFormation::Init":{
+                "config":{
+                    "commands":{
+                    "01_add_instance_to_cluster": {
+                        "command":{
+                            "Fn::Join":[
+                                "",
+                                [
+                                "#!/bin/bash\n",
+                                "echo ECS_CLUSTER=",
+                                {
+                                    "Ref":"Cluster"
+                                },
+                                " >> /etc/ecs/ecs.config"
+                                ]
+                            ]
+                        }
+                    }
+                    },
+                    "files":{
+                    "/etc/cfn/cfn-hup.conf":{
+                        "content":{
+                        "Fn::Join":[
+                            "",
+                            [
+                            "[main]\n",
+                            "stack=",
+                            {
+                                "Ref":"AWS::StackId"
+                            },
+                            "\n",
+                            "region=",
+                            {
+                                "Ref":"AWS::Region"
+                            },
+                            "\n"
+                            ]
+                        ]
+                        },
+                        "mode":"000400",
+                        "owner":"root",
+                        "group":"root"
+                    },
+                    "/etc/cfn/hooks.d/cfn-auto-reloader.conf":{
+                        "content":{
+                        "Fn::Join":[
+                            "",
+                            [
+                            "[cfn-auto-reloader-hook]\n",
+                            "triggers=post.update\n",
+                            "path=Resources.ContainerInstances.Metadata.AWS::CloudFormation::Init\n",
+                            "action=/opt/aws/bin/cfn-init -v ",
+                            "         --stack ",
+                            {
+                                "Ref":"AWS::StackName"
+                            },
+                            "         --resource ContainerInstances ",
+                            "         --region ",
+                            {
+                                "Ref":"AWS::Region"
+                            },
+                            "\n",
+                            "runas=root\n"
+                            ]
+                        ]
+                        }
+                    }
+                    }
+                    }
+                }
+            }
+        },
+    "ECSAutoScalingGroup":{
+        "Type":"AWS::AutoScaling::AutoScalingGroup",
+            "DependsOn":[
+                "VPC"
+            ],
+            "Properties":{
+            "VPCZoneIdentifier":[
+                {
+                "Ref":"Subnet1"
+                },
+                {
+                "Ref":"Subnet2"
+                }
+            ],
+            "LaunchConfigurationName":{
+                "Ref":"ContainerInstances"
+            },
+            "MinSize":"1",
+            "MaxSize":"2",
+            "DesiredCapacity":"1"
+            },
+            "CreationPolicy":{
+                "ResourceSignal":{
+                    "Timeout":"PT15M"
+                }
+            },
+            "UpdatePolicy":{
+                "AutoScalingRollingUpdate":{
+                    "MinInstancesInService":"1",
+                    "MaxBatchSize":"1",
+                    "PauseTime":"PT15M",
+                    "WaitOnResourceSignals":true
                 }
             }
         }

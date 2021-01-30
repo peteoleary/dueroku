@@ -20,9 +20,15 @@ class CloudFormationCommand extends CommandBase {
     }
 
     async doGenerateCloudFormationTemplate(name, app_config, env_doc, force) {
-      const vars = this.makeTemplateVars(app_config, env_doc)
+      const vars = await this.makeTemplateVars(name, app_config, env_doc)
       var file_text = (new TemplateEngine).resolveTemplate('cloudformation.json', vars)
       this.writeOrReplaceFile('cloudformation.json', file_text, force)
+      
+      try {
+        require('jsonlint').parse(file_text)
+      } catch (err) {
+        console.log(err)
+      }
       return JSON.parse(file_text)
     }
 
