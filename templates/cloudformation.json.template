@@ -3,8 +3,8 @@
     "Description": "Description here.",
     "Parameters": {
         "LatestAmiId": {
-            "Type": "AWS::EC2::Image::Id",
-            "Default": "ami-00d7aa0cdc52740b5"
+            "Type": "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id",
+            "Default": "/aws/service/ecs/optimized-ami/amazon-linux/recommended/image_id"
         },
         "SubnetAvailabilityZone1": {
             "Description": "Availability Zone for Subnet 1",
@@ -334,30 +334,6 @@
                     "SubnetId" : { "Ref": "Subnet2" }
                 }
         },
-        "SecurityGroup": {
-            "Type": "AWS::EC2::SecurityGroup",
-            "Properties": {
-                "GroupDescription": "Enable HTTP access via port 80 locked down to the load balancer + SSH access",
-                "SecurityGroupIngress": [
-                    {
-                        "IpProtocol": "tcp",
-                        "FromPort": "80",
-                        "ToPort": "80"
-                    },
-                    {
-                        "IpProtocol": "tcp",
-                        "FromPort": "22",
-                        "ToPort": "22",
-                        "CidrIp": {
-                            "Ref": "SSHLocation"
-                        }
-                    }
-                ],
-                "VpcId": {
-                    "Ref": "VPC"
-                }
-            }
-        },
         "TargetGroup": {
             "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
             "Properties": {
@@ -383,6 +359,16 @@
                 }
             }
         },
+        "VPCDefaultSecurityGroupIngress": {
+            "Type" : "AWS::EC2::SecurityGroupIngress",
+            "Properties" : {
+                "GroupId": { "Fn::GetAtt" : ["VPC", "DefaultSecurityGroup"] },
+                "IpProtocol":"tcp",
+                "FromPort":"22",
+                "ToPort":"22",
+                "CidrIp":"0.0.0.0/0"
+            }
+            },
         "RouteTable":{
             "Type":"AWS::EC2::RouteTable",
             "Properties":{
@@ -463,83 +449,38 @@
                 "AssociatePublicIpAddress": true,
                 "ImageId": {"Ref": "LatestAmiId"},
                 "InstanceType": {"Ref": "InstanceType"},
-                "KeyName": {"Ref": "KeyName"}
+                "KeyName": {"Ref": "KeyName"},
+                "UserData":{
+                    "Fn::Base64":{
+                        "Fn::Join":[
+                        "",
+                        [
+                            "#!/bin/bash -xe\n",
+                            "echo ECS_CLUSTER=",
+                            {
+                            "Ref":"Cluster"
+                            },
+                            " >> /etc/ecs/ecs.config\n",
+                            "yum install -y aws-cfn-bootstrap\n",
+                            "/opt/aws/bin/cfn-signal -e $? ",
+                            "         --stack ",
+                            {
+                            "Ref":"AWS::StackName"
+                            },
+                            "         --resource ECSAutoScalingGroup ",
+                            "         --region ",
+                            {
+                            "Ref":"AWS::Region"
+                            },
+                            "\n"
+                        ]
+                        ]
+                    }
+                }
             },
             "DependsOn":[
                 "VPC"
-            ],
-            "Metadata":{
-                "AWS::CloudFormation::Init":{
-                "config":{
-                    "commands":{
-                    "01_add_instance_to_cluster": {
-                        "command":{
-                            "Fn::Join":[
-                                "",
-                                [
-                                "#!/bin/bash\n",
-                                "echo ECS_CLUSTER=",
-                                {
-                                    "Ref":"Cluster"
-                                },
-                                " >> /etc/ecs/ecs.config"
-                                ]
-                            ]
-                        }
-                    }
-                    },
-                    "files":{
-                    "/etc/cfn/cfn-hup.conf":{
-                        "content":{
-                        "Fn::Join":[
-                            "",
-                            [
-                            "[main]\n",
-                            "stack=",
-                            {
-                                "Ref":"AWS::StackId"
-                            },
-                            "\n",
-                            "region=",
-                            {
-                                "Ref":"AWS::Region"
-                            },
-                            "\n"
-                            ]
-                        ]
-                        },
-                        "mode":"000400",
-                        "owner":"root",
-                        "group":"root"
-                    },
-                    "/etc/cfn/hooks.d/cfn-auto-reloader.conf":{
-                        "content":{
-                        "Fn::Join":[
-                            "",
-                            [
-                            "[cfn-auto-reloader-hook]\n",
-                            "triggers=post.update\n",
-                            "path=Resources.ContainerInstances.Metadata.AWS::CloudFormation::Init\n",
-                            "action=/opt/aws/bin/cfn-init -v ",
-                            "         --stack ",
-                            {
-                                "Ref":"AWS::StackName"
-                            },
-                            "         --resource ContainerInstances ",
-                            "         --region ",
-                            {
-                                "Ref":"AWS::Region"
-                            },
-                            "\n",
-                            "runas=root\n"
-                            ]
-                        ]
-                        }
-                    }
-                    }
-                    }
-                }
-            }
+            ]
         },
     "ECSAutoScalingGroup":{
         "Type":"AWS::AutoScaling::AutoScalingGroup",
