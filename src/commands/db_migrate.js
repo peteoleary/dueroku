@@ -80,9 +80,12 @@ class DBMigrateCommand extends Command {
       
 }
 
-DBMigrateCommand.description = `Describe the command here
+DBMigrateCommand.description = `copy data to and from local db table to Heroku hosted database
 ...
-Extra documentation goes here
+Bulk copy rows to or from cloud database. WARNING! This command has only been tested with Postgres databases and it can (obviously) mess up a database in a hurry. Use much caution.
+
+Requires DATABASE_HOST, DATABASE_USER and DATABASE_NAME env set for local db
+Requires HEROKU_DB_HOST, HEROKU_DB_USER, HEROKU_DB_NAME and HEROKU_DB_PASSWORD set for Heroku database
 `
 
 DBMigrateCommand.flags = {
@@ -91,5 +94,11 @@ DBMigrateCommand.flags = {
   direction: flags.string({char: 'd', description: 'direction: down or up'}),
   force: flags.boolean({char: 'f', description: 'force file overwrites'})
 }
+
+// TODO: this doesn't seem to work?
+DBMigrateCommand.topic = 'dueroku'
+DBMigrateCommand.command = 'dbmigrate'
+
+DBMigrateCommand.hidden = false
 
 module.exports = DBMigrateCommand

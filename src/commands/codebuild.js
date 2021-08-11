@@ -84,7 +84,6 @@ class CodeBuildCommand extends CommandBase {
   async run() {
     const { flags } = this.parse(CodeBuildCommand)
     const name = flags.app || this.heroku_tools.getCurrentHerokuAppName() || this.fail('run command from inside Heroku app directory or provide -a app_name')
-    this.log(`hello ${name} from /Users/pete_o/Documents/Dev/dueroku/src/commands/codebuild.js`)
 
     // get production env
     var app_config = await this.heroku_tools.getAppConfig(name)
@@ -96,10 +95,12 @@ class CodeBuildCommand extends CommandBase {
 
 }
 
-CodeBuildCommand.description = `Describe the command here
+CodeBuildCommand.description = `create files to set up AWS Codebuild
 ...
-Extra documentation goes here
+Uses templates/create_codebuild_project.json.template to create create_codebuild_project.json file to configure Codebuild for current project
 `
+
+CodeBuildCommand.hidden = false
 
 CodeBuildCommand.flags = {
   app: flags.string({ char: 'a', description: 'app to operate on' }),

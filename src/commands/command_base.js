@@ -140,4 +140,7 @@ class CommandBase extends Command {
     }
 }
 
+// hide the base class from Heroku CLI, NOTE you must explicitly override this attribute in all subclasses
+CommandBase.hidden = true
+
 module.exports = {CommandBase}

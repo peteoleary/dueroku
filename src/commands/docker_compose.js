@@ -154,7 +154,6 @@ class DockerComposeCommand extends CommandBase {
   async run() {
     const {flags} = this.parse(DockerComposeCommand)
     const name = flags.app || this.heroku_tools.getCurrentHerokuAppName() || this.fail('run command from inside Heroku app directory or provide -a app_name')
-    this.log(`hello ${name} from /Users/pete_o/Documents/Dev/dueroku/src/commands/docker_compose.js`)
 
     const app_information_req = await this.heroku_tools.getAppInformation(name)
     const app_addon_information_req = await this.heroku_tools.getAppAddonInformation(name)
@@ -164,14 +163,16 @@ class DockerComposeCommand extends CommandBase {
   }
 }
 
-DockerComposeCommand.description = `Describe the command here
+DockerComposeCommand.description = `create Dockerfile and docker-compose.yml from specififed project
 ...
-Extra documentation goes here
+Dueroku command uses templates/Dockerfile.rails.template and templates/docker-compose.yml.template to create files for use with Docker
 `
 
 DockerComposeCommand.flags = {
   app: flags.string({char: 'a', description: 'app to operate on'}),
   force: flags.boolean({char: 'f', description: 'force file overwrites'})
 }
+
+DockerComposeCommand.hidden = false
 
 module.exports = DockerComposeCommand

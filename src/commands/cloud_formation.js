@@ -35,7 +35,6 @@ class CloudFormationCommand extends CommandBase {
     async run() {
         const {flags} = this.parse(CloudFormationCommand)
         const name = flags.app || this.heroku_tools.getCurrentHerokuAppName() || this.fail('run command from inside Heroku app directory or provide -a app_name')
-        this.log(`hello ${name} from /Users/pete_o/Documents/Dev/dueroku/src/commands/blankcommand.js`)
 
        // get production env
        var app_config = await this.heroku_tools.getAppConfig(name)
@@ -47,10 +46,12 @@ class CloudFormationCommand extends CommandBase {
       
 }
 
-CloudFormationCommand.description = `Describe the command here
+CloudFormationCommand.description = `create cloudformation.json file from given app
 ...
-Extra documentation goes here
+This dueroku command uses templates/cloudformation.json.template to generate cloudformation.json to build a stack at AWS using CloudFormation
 `
+
+CloudFormationCommand.hidden = false
 
 CloudFormationCommand.flags = {
   app: flags.string({char: 'a', description: 'app to operate on'}),

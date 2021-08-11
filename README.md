@@ -1,56 +1,30 @@
 dueroku
 =======
 
-<!-- toc -->
+NOTE: this tool is a Work In Progress and has not been tested with very many Heroku configurations. Mainly it has been built and tested with Roby/Rails/Postgres as a focus although I intend to expand the number of supported configurations over time.
+
+Dueroku is a set of tool intended to help with the transition from Heroku to other platforms, in particular AWS. It does this by inspecting a Heroku configuration and generating files/artifacts that can be used to configure other systems like Docker, Elastic Container Service, etc.
+
+We are currently not following Heroku CLI plugin style guide https://devcenter.heroku.com/articles/cli-style-guide. Send me a PR!
+
 # Usage
-<!-- usage -->
+
+```
+git clone https://github.com/peteoleary/dueroku.git
+cd dueroku
+heroku plugins:link
+```
 
 # Commands
-<!-- commands -->
 
-# Some Docker debugging stuff
+Switch to Heroku app directory then:
 
-docker exec -it {container} /bin/bash
-echo $DATABASE_PASSWORD
-psql -h $DATABASE_HOST -U $DATABASE_USER -d $DATABASE_NAME
-docker run --env-file {container}.env -it {container} /bin/bash
+```
+heroku help cloud_formation
 
-# Herokuish
+heroku help db_migrate
 
-RUN curl --location --silent https://github.com/gliderlabs/herokuish/releases/download/v0.5.18/herokuish_0.5.18_linux_x86_64.tgz | tar -xzC ./bin
+heroku help codebuild
 
-# Heroku buildpacks
-
-t2.medium
-ubuntu 18.04
-
-sudo apt install ncdu
-
-git clone https://github.com/DroneBase/heroku-buildpack-exiftool
-git clone https://github.com/heroku/heroku-buildpack-ruby
-git clone https://github.com/heroku/stack-images
-
-ssh-keygen -t rsa -b 4096 -C "pete@timelight.com"
-cat .ssh/id_rsa.pub
-
-sudo apt update
-sudo apt-get install ruby-dev
-sudo apt-get install -y libgmp-dev
-sudo apt-get install -y libxml-dev
-sudo apt-get install -y libpq-dev
-sudo apt-get install libxml2-dev libxslt-dev
-
-cd stack-images/heroku-18 
-cp setup.sh /tmp/setup.sh
-sudo /tmp/setup.sh
-
-STACK=heroku-18 ./heroku-buildpack-ruby/bin/compile /home/ubuntu/ecommerce /home/ubuntu/ecommerce_cache /home/ubuntu/ecommerce_env
-STACK=heroku-18 ./heroku-buildpack-exiftool/bin/compile /home/ubuntu/ecommerce /home/ubuntu/ecommerce_cache /home/ubuntu/ecommerce_env
-
-export PWD=/home/ubuntu/ecommerce
-export HOME=/home/ubuntu/ecommerce
-export PATH="$HOME/bin:$APP_DIR/vendor/bundle/bin:$HOME/vendor/bundle/ruby/2.5.0/bin:$HOME/vendor/exiftool:$PATH"
-export GEM_PATH=$HOME/vendor/bundle/ruby/2.5.0
-
-set -a
-source .env
+heroku help docker_compose
+```
