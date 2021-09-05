@@ -6656,6 +6656,11 @@ joi@^11.1.1:
     isemail "3.x.x"
     topo "2.x.x"
 
+js-ini@^1.3.0:
+  version "1.3.0"
+  resolved "https://registry.yarnpkg.com/js-ini/-/js-ini-1.3.0.tgz#b84a3a0bbacfdb3eb1b92e2ebd7c8c3f1f98339b"
+  integrity sha512-5MSh1zdBn/r3xnts6YfENzVuIGU2gbJ/Ib6zemYi+04Ui0AQp2QCNoTrlQdn0yNkaNVVg9wHZaoG5bW7Lv+3bA==
+
 js-levenshtein@^1.1.3:
   version "1.1.6"
   resolved "https://registry.yarnpkg.com/js-levenshtein/-/js-levenshtein-1.1.6.tgz#c6cee58eb3550372df8deb85fad5ce66ce01d59d"
@@ -10034,6 +10039,11 @@ set-blocking@^2.0.0, set-blocking@~2.0.0:
   version "2.0.0"
   resolved "https://registry.yarnpkg.com/set-blocking/-/set-blocking-2.0.0.tgz#045f9782d011ae9a6803ddd382b24392b3d890f7"
   integrity sha1-BF+XgtARrppoA93TgrJDkrPYkPc=
+
+set-operations@^1.2.1:
+  version "1.2.1"
+  resolved "https://registry.yarnpkg.com/set-operations/-/set-operations-1.2.1.tgz#b56f6d9616796eecb360a0869c1209e692d9c7f6"
+  integrity sha512-1+d3XSfCYr6Aym86QU7lkr24WmfabrHUAVfhu0plTLjG6BrpVqRnMcvVvxG2Lz/EfwfQU5nqrhISY6zsecr+Fg==
 
 set-value@^2.0.0, set-value@^2.0.1:
   version "2.0.1"

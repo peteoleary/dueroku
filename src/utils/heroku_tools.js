@@ -1,5 +1,5 @@
 const {Command, flags} = require('@heroku-cli/command')
-var fs = require('fs'), ini = require('ini'), url = require("url")
+var fs = require('fs'), ini = require('js-ini'), url = require("url")
 const dotenv = require('dotenv')
 const gemfile = require('gemfile-parser')
 const yaml = require('js-yaml')
@@ -145,16 +145,29 @@ class HerokuTools {
       }
     
       getCurrentHerokuAppName() {
-        var config = this.gitConfig()
-    
-        if ("remote \"heroku\"" in config) {
-          var url_parts = url.parse(config["remote \"heroku\""].url)
-    
-          // TODO: this is fragile
-          return url_parts.pathname.split('.')[0].replace("\/", "")
-        } else {
+        const config = this.gitConfig()
+
+        function match_it(re, s) {
+          let matches = re.exec(s)
+          if (matches && matches.length == 2) {
+            return matches[1]
+          }
           return null
         }
+
+        let apps = Object.entries(config).map(entry => {
+          if (entry[1].url) {
+            let match = match_it(/git@heroku.com:(.*)\.git/, entry[1].url)
+            if (match) return match
+            match = match_it(/https:\/\/git.heroku.com\/(.*).git/, entry[1].url)
+            if (match) return match
+          }
+          return null
+        })
+        apps = apps.filter((obj) => obj)
+        if (apps.length == 0) return null
+        if (apps.length == 1) return apps[0]
+        return apps
       }
 }
 
